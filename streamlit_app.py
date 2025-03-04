@@ -52,6 +52,16 @@ def train_and_evaluate_models(train_set, test_set):
     X_test = test_set.drop("median_house_value", axis=1)
     y_test = test_set["median_house_value"].copy()
     
+    # Verificar valores faltantes
+    if housing.isnull().any().any():
+        st.error("El conjunto de datos contiene valores faltantes (NaN). Por favor, limpia los datos antes de continuar.")
+        return
+    
+    # Verificar valores infinitos
+    if np.isinf(housing.select_dtypes(include=[np.number])).any().any():
+        st.error("El conjunto de datos contiene valores infinitos (inf). Por favor, limpia los datos antes de continuar.")
+        return
+    
     # Definir los parámetros de los modelos
     param_grid_linear = {
         'fit_intercept': [True, False],
@@ -78,26 +88,30 @@ def train_and_evaluate_models(train_set, test_set):
     results = {}
     
     for model_name, (model, param_grid) in models.items():
-        grid_search = GridSearchCV(model, param_grid, cv=5,
-                                   scoring='neg_mean_squared_error',
-                                   return_train_score=True)
-        grid_search.fit(housing, housing_labels)
-        
-        final_model = grid_search.best_estimator_
-        final_predictions = final_model.predict(X_test)
-        final_rmse = np.sqrt(mean_squared_error(y_test, final_predictions))
-        
-        # Intervalo de confianza
-        confidence = 0.95
-        squared_errors = (final_predictions - y_test) ** 2
-        confidence_interval = np.sqrt(stats.t.interval(confidence, len(squared_errors) - 1,
-                                         loc=squared_errors.mean(),
-                                         scale=stats.sem(squared_errors)))
-        
-        results[model_name] = {
-            "rmse": final_rmse,
-            "confidence_interval": confidence_interval
-        }
+        try:
+            grid_search = GridSearchCV(model, param_grid, cv=5,
+                                       scoring='neg_mean_squared_error',
+                                       return_train_score=True)
+            grid_search.fit(housing, housing_labels)
+            
+            final_model = grid_search.best_estimator_
+            final_predictions = final_model.predict(X_test)
+            final_rmse = np.sqrt(mean_squared_error(y_test, final_predictions))
+            
+            # Intervalo de confianza
+            confidence = 0.95
+            squared_errors = (final_predictions - y_test) ** 2
+            confidence_interval = np.sqrt(stats.t.interval(confidence, len(squared_errors) - 1,
+                                             loc=squared_errors.mean(),
+                                             scale=stats.sem(squared_errors)))
+            
+            results[model_name] = {
+                "rmse": final_rmse,
+                "confidence_interval": confidence_interval
+            }
+        except Exception as e:
+            st.error(f"Error durante el entrenamiento del modelo {model_name}: {e}")
+            continue
     
     return results
 
@@ -122,14 +136,15 @@ def main():
             if st.button("Entrenar y evaluar modelos"):
                 results = train_and_evaluate_models(train_set, test_set)
                 
-                st.write("Resultados de todos los modelos:")
-                for model_name, result in results.items():
-                    st.write(f"- {model_name}:")
-                    st.write(f"  RMSE: {result['rmse']}")
-                    st.write(f"  Intervalo de confianza: {result['confidence_interval']}")
-                
-                best_model = min(results, key=lambda x: results[x]['rmse'])
-                st.write(f"\nEl mejor modelo es: {best_model} con un RMSE de {results[best_model]['rmse']}")
+                if results:
+                    st.write("Resultados de todos los modelos:")
+                    for model_name, result in results.items():
+                        st.write(f"- {model_name}:")
+                        st.write(f"  RMSE: {result['rmse']}")
+                        st.write(f"  Intervalo de confianza: {result['confidence_interval']}")
+                    
+                    best_model = min(results, key=lambda x: results[x]['rmse'])
+                    st.write(f"\nEl mejor modelo es: {best_model} con un RMSE de {results[best_model]['rmse']}")
 
 if __name__ == "__main__":
     main()

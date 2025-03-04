@@ -10,6 +10,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 from scipy import stats
 import matplotlib.pyplot as plt
+from sklearn.impute import SimpleImputer
 
 # Cargar los datos
 @st.cache
@@ -44,6 +45,25 @@ def preprocess_data(housing):
     
     return strat_train_set, strat_test_set
 
+# Limpiar datos (imputar valores faltantes)
+def clean_data(housing):
+    # Verificar valores faltantes
+    if housing.isnull().any().any():
+        st.write("Columnas con valores faltantes (NaN):")
+        st.write(housing.isnull().sum())
+        
+        # Imputar valores faltantes con la mediana
+        imputer = SimpleImputer(strategy="median")
+        housing_num = housing.select_dtypes(include=[np.number])  # Solo columnas numéricas
+        housing_num_imputed = imputer.fit_transform(housing_num)
+        housing_num_imputed = pd.DataFrame(housing_num_imputed, columns=housing_num.columns, index=housing_num.index)
+        
+        # Combinar con las columnas no numéricas
+        housing_cat = housing.select_dtypes(exclude=[np.number])
+        housing = pd.concat([housing_num_imputed, housing_cat], axis=1)
+    
+    return housing
+
 # Entrenar y evaluar modelos
 def train_and_evaluate_models(train_set, test_set):
     housing = train_set.drop("median_house_value", axis=1)
@@ -54,7 +74,7 @@ def train_and_evaluate_models(train_set, test_set):
     
     # Verificar valores faltantes
     if housing.isnull().any().any():
-        st.error("El conjunto de datos contiene valores faltantes (NaN). Por favor, limpia los datos antes de continuar.")
+        st.error("El conjunto de datos todavía contiene valores faltantes (NaN). Por favor, limpia los datos antes de continuar.")
         return
     
     # Verificar valores infinitos
@@ -129,6 +149,9 @@ def main():
         if "median_income" not in housing.columns:
             st.error("La columna 'median_income' no existe en el archivo CSV.")
         else:
+            # Limpiar datos
+            housing = clean_data(housing)
+            
             # Preprocesar datos
             train_set, test_set = preprocess_data(housing)
             

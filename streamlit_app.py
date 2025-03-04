@@ -11,6 +11,7 @@ from sklearn.metrics import mean_squared_error
 from scipy import stats
 import matplotlib.pyplot as plt
 from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder
 
 # Cargar los datos
 @st.cache
@@ -45,8 +46,8 @@ def preprocess_data(housing):
     
     return strat_train_set, strat_test_set
 
-# Limpiar datos (imputar valores faltantes)
-def clean_data(housing):
+# Limpiar y codificar datos
+def clean_and_encode_data(housing):
     # Verificar valores faltantes
     if housing.isnull().any().any():
         st.write("Columnas con valores faltantes (NaN):")
@@ -61,6 +62,16 @@ def clean_data(housing):
         # Combinar con las columnas no numéricas
         housing_cat = housing.select_dtypes(exclude=[np.number])
         housing = pd.concat([housing_num_imputed, housing_cat], axis=1)
+    
+    # Codificar la columna categórica 'ocean_proximity'
+    if "ocean_proximity" in housing.columns:
+        cat_encoder = OneHotEncoder()
+        housing_cat_encoded = cat_encoder.fit_transform(housing[["ocean_proximity"]])
+        housing_cat_encoded = pd.DataFrame(housing_cat_encoded.toarray(), columns=cat_encoder.get_feature_names_out(["ocean_proximity"]))
+        
+        # Eliminar la columna categórica original y concatenar las nuevas columnas codificadas
+        housing = housing.drop("ocean_proximity", axis=1)
+        housing = pd.concat([housing, housing_cat_encoded], axis=1)
     
     return housing
 
@@ -149,8 +160,8 @@ def main():
         if "median_income" not in housing.columns:
             st.error("La columna 'median_income' no existe en el archivo CSV.")
         else:
-            # Limpiar datos
-            housing = clean_data(housing)
+            # Limpiar y codificar datos
+            housing = clean_and_encode_data(housing)
             
             # Preprocesar datos
             train_set, test_set = preprocess_data(housing)

@@ -48,8 +48,18 @@ def preprocess_data(housing):
 def clean_and_encode_data(housing):
     # Verificar valores faltantes
     if housing.isnull().any().any():
-        # Eliminar filas con valores faltantes
-        housing = housing.dropna()
+        # st.write("Columnas con valores faltantes (NaN):")
+        # st.write(housing.isnull().sum())
+        
+        # Imputar valores faltantes con la mediana
+        imputer = SimpleImputer(strategy="median")
+        housing_num = housing.select_dtypes(include=[np.number])  # Solo columnas numéricas
+        housing_num_imputed = imputer.fit_transform(housing_num)
+        housing_num_imputed = pd.DataFrame(housing_num_imputed, columns=housing_num.columns, index=housing_num.index)
+        
+        # Combinar con las columnas no numéricas
+        housing_cat = housing.select_dtypes(exclude=[np.number])
+        housing = pd.concat([housing_num_imputed, housing_cat], axis=1)
     
     # Codificar la columna categórica 'ocean_proximity'
     if "ocean_proximity" in housing.columns:
